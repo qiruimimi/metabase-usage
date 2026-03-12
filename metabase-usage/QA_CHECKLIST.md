@@ -132,60 +132,46 @@
 
 ---
 
-## 🎯 Dashboard 参数绑定完整检查清单
+## 🎯 Dashboard 参数绑定（MBQL Question）
 
-### 创建/修改 Dashboard 时必查
-- [ ] **Question 有参数定义吗？**
-  ```json
-  // Question 里必须有
-  "parameters": [
-    {"id": "date_param_1", "name": "日期范围", "type": "date/all-options", ...}
-  ]
-  ```
-  
-- [ ] **Dashboard 参数和 Question 参数 ID 一致吗？**
-  - Dashboard: `"id": "date_param_1"`
-  - Question: `"id": "date_param_1"` ✓ 必须相同！
-  
-- [ ] **参数映射的 target 字段完整吗？**
-  ```json
-  // 必须包含 join-alias！
-  "target": ["dimension", ["field", "pay_success_date", {
-    "base-type": "type/DateTime",
-    "join-alias": "detail_table"  // ← 不能省略
-  }]]
-  ```
+### 关键认知
+**MBQL Question 本身不需要 `parameters` 定义！**
+- Dashboard 筛选项可以直接绑定到 Question 的任意字段
+- 只有 Native SQL Question 才需要 `template-tags` 参数定义
 
-### 常见参数绑定错误
+### 正确的绑定方式
 
-| 现象 | 原因 | 解决 |
-|------|------|------|
-| 筛选项显示"无效参数" | Question 没有 parameters 定义 | 给 Question 添加 parameters 数组 |
-| 参数不生效 | 参数 ID 不匹配 | 确保 Dashboard 和 Question 的 id 完全一致 |
-| 500 错误 | 缺少 join-alias | 参数映射的 target 必须包含完整字段引用 |
-
-### 正确的参数配置流程
-
+**Dashboard 配置参数：**
+```json
+"parameters": [
+  {
+    "name": "日期范围",
+    "id": "date_param_1",  // Dashboard 内部 ID
+    "type": "date/all-options"
+  }
+]
 ```
-1. Question 配置
-   "parameters": [
-     {"id": "param_1", "name": "日期", "type": "date/all-options"}
-   ]
-   
-2. Dashboard 配置
-   "parameters": [
-     {"id": "param_1", ...}  // id 必须和 Question 一致
-   ]
-   
-3. Dashcard 参数映射
-   "parameter_mappings": [
-     {
-       "parameter_id": "param_1",  // Dashboard 参数 ID
-       "card_id": 123,
-       "target": ["dimension", ["field", "date", {"join-alias": "table"}]]
-     }
-   ]
+
+**Dashcard 参数映射（直接绑定到字段）：**
+```json
+"parameter_mappings": [
+  {
+    "parameter_id": "date_param_1",  // Dashboard 参数 ID
+    "card_id": 4465,
+    "target": ["dimension", ["field", "pay_success_date", {
+      "base-type": "type/DateTime",
+      "join-alias": "detail_table"  // 完整字段引用
+    }]]
+  }
+]
 ```
+
+### MBQL vs Native SQL 参数区别
+
+| 类型 | Question 配置 | Dashboard 绑定 |
+|------|--------------|----------------|
+| **MBQL** | 不需要 parameters | 直接绑定到字段 |
+| **Native SQL** | 需要 `template-tags` | 绑定到 template-tag |
 
 ---
 
@@ -258,49 +244,59 @@ Full Width 模式示例:
 
 ### 本次任务犯的错误（完整列表）
 
-1. **Question 参数定义缺失** ❌
-   - 错误：创建 Question 时没有添加 `parameters` 数组
-   - 后果：Dashboard 筛选项显示"无效参数"
-   - 解决：Question 必须包含和 Dashboard 匹配的参数定义
+1. **Question 硬编码时间筛选** ❌
+   - 错误：Question 里写了 `time-interval`，和 Dashboard 参数冲突
+   - 后果：参数不生效
+   - 解决：Question 只留业务筛选，时间交给 Dashboard
 
-2. **参数 ID 不匹配** ❌
-   - 错误：Dashboard 绑定了 `date_param_1`，但 Question 里没有这个 ID
-   - 后果：参数无法传递
-   - 解决：确保两边 ID 完全一致
-
-3. **删除 Question 后未更新 Dashboard** ❌
+2. **删除 Question 后未更新 Dashboard** ❌
    - 错误：删除 4463 后 Dashboard 还引用它
    - 后果：Dashboard 显示错误
-   - 解决：删除 Question 前先检查 Dashboard 引用，或同时更新 Dashboard
+   - 解决：删除前先检查引用，或同时更新
 
-4. **MBQL Question 参数传递方式混淆** ❌
-   - 错误：以为 MBQL 和 Native SQL 参数配置方式相同
-   - 后果：template-tags 配置无效
-   - 解决：MBQL 用 `parameters` 数组，Native SQL 用 `template-tags`
+3. **参数映射缺少 join-alias** ❌
+   - 错误：target 字段引用不完整
+   - 后果：500 错误
+   - 解决：必须包含完整的 `join-alias`
 
-5. **缺少完整的测试验证** ❌
-   - 错误：创建后没有检查参数绑定是否生效
-   - 后果：用户发现后才能修复
-   - 解决：创建后必须测试带参数的查询
+4. **画蛇添足：给 MBQL Question 加 parameters** ❌❌❌
+   - 错误：以为 Question 也需要 `parameters` 定义
+   - 实际情况：**MBQL Question 不需要 parameters！**
+   - Dashboard 直接绑定到字段即可
+   - 只有 Native SQL 才需要 template-tags
+   - **深刻教训：不要凭猜测，要先验证机制**
 
-### 正确的完整流程（以后必须遵守）
+5. **缺少完整测试** ❌
+   - 错误：没测试带参数的完整流程
+   - 后果：用户发现后才修复
+
+### 核心认知纠正
+
+**MBQL Question 参数机制：**
+```
+Dashboard 参数 ──→ 直接绑定到 Question 字段
+       ↓
+  parameter_mappings.target = ["dimension", ["field", "date", {...}}]]
+```
+
+**不需要：**
+```
+❌ Question.parameters
+❌ Question.template-tags (这是 Native SQL 用的)
+```
+
+### 正确的完整流程
 
 ```
-创建 Question
-  ↓
-添加 parameters 定义（和 Dashboard 计划的一致）
-  ↓
-测试 Question 基础查询
+创建 MBQL Question
+  ↓ 不需要 parameters！
+测试基础查询
   ↓
 创建 Dashboard
-  ↓
-添加参数（id 和 Question 一致）
-  ↓
-添加卡片 + 参数映射（含 join-alias）
+  ↓ 配置参数和映射
+添加卡片 + 参数映射（直接绑定到字段，含 join-alias）
   ↓
 测试带参数的 Dashboard 查询
-  ↓
-检查可视化效果
   ↓
 完成
 ```
