@@ -218,6 +218,12 @@ Full Width 模式示例:
 
 ## 🎯 团队协作注意事项
 
+### 6. Time Grouping（时间粒度）筛选
+- [ ] **修改 Question 的 `temporal-unit` 后，必须重新关联 Dashboard 时间粒度筛选**
+  - Metabase 缺陷：Question 聚合粒度变化后，时间粒度筛选不会自动更新
+  - 解决：手动删除并重新添加时间粒度筛选，或重新关联参数
+  - 症状：时间粒度切换无效或报错
+
 ### 修改 Dashboard 前
 - [ ] 检查当前布局配置（width, cards 位置）
 - [ ] 记录现有卡片引用关系
